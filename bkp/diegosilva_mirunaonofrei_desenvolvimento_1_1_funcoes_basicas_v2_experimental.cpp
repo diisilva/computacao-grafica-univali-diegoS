@@ -4,12 +4,18 @@
 // translacao, escala e rotacao manualmente em 3D, sem glTranslate,
 // glRotate ou glScale.
 //
+// V2 EXPERIMENTAL (demonstracao visual):
+// - Versao separada da entrega oficial.
+// - Ao tocar/sair da borda em X/Y, o cubo nao atravessa imediatamente.
+// - Primeiro ele gira 360 graus automaticamente.
+// - So depois reaparece no lado oposto.
+//
 // Resumo didatico da arquitetura:
 // 1) A geometria (vertices + arestas) fica na struct Poligono3D.
 // 2) As transformacoes sao feitas manualmente sobre os vertices.
 // 3) O desenho usa apenas GL_LINES (wireframe puro).
 // 4) O callback de teclado aplica translacao, escala e rotacao.
-// 5) O wrap-around reposiciona o cubo no plano XY ao sair da area visivel.
+// 5) O timer atualiza a transicao de borda com giro automatico de 360 graus.
 
 #include <iostream>
 #include <vector>
@@ -40,6 +46,17 @@ struct Poligono3D {
     lista_arestas arestas;
 };
 
+struct LimitesTela {
+    // Limites visiveis da janela no mundo para o Z atual do cubo.
+    double min_x;
+    double max_x;
+    double min_y;
+    double max_y;
+    // Semi-extensoes atuais do cubo (considera escala e rotacao).
+    double raio_x;
+    double raio_y;
+};
+
 // Observacao importante de conformidade academica:
 // - O trabalho permanece em wireframe com GL_LINES.
 // - Nao ha preenchimento de faces.
@@ -55,8 +72,16 @@ void movimentar(Poligono3D& poligono, double delta_x, double delta_y, double del
 void escalar(Poligono3D& poligono, double escala_x, double escala_y, double escala_z);
 // Aplica rotacao por eixo (x, y ou z) usando o centro como pivô.
 void rotacionar(Poligono3D& poligono, double angulo, char eixo);
-// Aplica wrap-around no plano XY considerando projecao e tamanho atual do objeto.
-void aplicar_wraparound_xy(Poligono3D& poligono);
+// Calcula os limites visiveis da tela no espaco de mundo para o cubo atual.
+LimitesTela calcular_limites_tela(const Poligono3D& poligono);
+// Detecta toque/saida de borda no plano XY.
+bool detectar_saida_xy(const Poligono3D& poligono, char& direcao_saida);
+// Inicia o estado de transicao de borda.
+void iniciar_transicao_borda(char direcao_saida);
+// Atualiza o giro automatico da transicao no timer.
+void atualizar_transicao_borda();
+// Reaparece no lado oposto ao concluir o giro.
+void reaparecer_no_lado_oposto(Poligono3D& poligono, char direcao_saida);
 
 // Callbacks GLUT.
 void display();
@@ -74,6 +99,16 @@ int janela_largura = 900;
 int janela_altura = 600;
 // Campo de visao vertical usado na projecao perspectiva.
 const double fov_y_graus = 60.0;
+// Constante para comparacoes de ponto flutuante.
+const double epsilon = 1e-9;
+
+// Estado da transicao de borda (V2 experimental).
+bool em_transicao_borda = false;
+char direcao_transicao = 'n';
+char eixo_rotacao_transicao = 'z';
+double giro_acumulado_transicao = 0.0;
+double passo_giro_transicao = 0.08;
+double giro_total_transicao = 2.0 * M_PI;
 
 int main(int argc, char** argv) {
     // Cubo inicial centrado no eixo Z negativo para ficar visivel em perspectiva.
@@ -83,7 +118,7 @@ int main(int argc, char** argv) {
     // Double buffer + RGB + depth buffer para visualizacao 3D correta.
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(900, 600);
-    glutCreateWindow("Trabalho 1.1 - Funcoes Basicas 3D");
+    glutCreateWindow("Trabalho 1.1 - Funcoes Basicas 3D - V2 Experimental");
 
     // Fundo preto e teste de profundidade ativo.
     glClearColor(0.0, 0.0, 0.0, 1.0);
@@ -239,6 +274,9 @@ void keyboard_special(int key, int x, int y) {
 
 void redraw(int value) {
     (void)value;
+    // Atualiza a animacao da transicao de borda no loop de timer.
+    atualizar_transicao_borda();
+
     // Solicita novo quadro e reagenda o timer.
     // Isso mantem o loop de redesenho constante (aprox. 60 FPS).
     glutPostRedisplay();
@@ -279,6 +317,12 @@ Poligono3D criar_cubo(double centro_x, double centro_y, double centro_z, double 
 }
 
 void movimentar(Poligono3D& poligono, double delta_x, double delta_y, double delta_z) {
+    // Enquanto estiver em transicao de borda, bloqueia translacao em X/Y
+    // para manter o giro automatico estavel.
+    if (em_transicao_borda && (std::abs(delta_x) > epsilon || std::abs(delta_y) > epsilon)) {
+        return;
+    }
+
     // Atualiza o centro para manter consistencia com as proximas transformacoes.
     poligono.centro[0] += delta_x;
     poligono.centro[1] += delta_y;
@@ -291,9 +335,14 @@ void movimentar(Poligono3D& poligono, double delta_x, double delta_y, double del
         poligono.vertices[i][2] += delta_z;
     }
 
-    // Wrap-around no plano XY para evitar desaparecimento ao sair da tela.
-    // A logica atua apos qualquer translacao para manter consistencia visual.
-    aplicar_wraparound_xy(poligono);
+    // Na V2, o wrap nao e imediato.
+    // Ao tocar/sair da borda, inicia o estado de giro de 360 graus.
+    if (!em_transicao_borda) {
+        char direcao_saida = 'n';
+        if (detectar_saida_xy(poligono, direcao_saida)) {
+            iniciar_transicao_borda(direcao_saida);
+        }
+    }
 }
 
 void escalar(Poligono3D& poligono, double escala_x, double escala_y, double escala_z) {
@@ -416,9 +465,17 @@ void desenhar(const Poligono3D& poligono) {
     glEnd();
 }
 
-void aplicar_wraparound_xy(Poligono3D& poligono) {
+LimitesTela calcular_limites_tela(const Poligono3D& poligono) {
+    LimitesTela limites;
+
     if (janela_altura <= 0) {
-        return;
+        limites.min_x = -1.0;
+        limites.max_x = 1.0;
+        limites.min_y = -1.0;
+        limites.max_y = 1.0;
+        limites.raio_x = 0.0;
+        limites.raio_y = 0.0;
+        return limites;
     }
 
     double aspecto = static_cast<double>(janela_largura) / static_cast<double>(janela_altura);
@@ -426,20 +483,15 @@ void aplicar_wraparound_xy(Poligono3D& poligono) {
         aspecto = 1.0;
     }
 
-    // Distancia do objeto ao observador (camera na origem olhando para -Z).
-    // Como o cubo esta no semiespaco z negativo, usa-se -centro.z.
     double distancia_camera = -poligono.centro[2];
     if (distancia_camera < 0.2) {
         distancia_camera = 0.2;
     }
 
-    // Converte FOV para radianos para uso com tan().
     double fov_y_rad = fov_y_graus * M_PI / 180.0;
     double metade_visivel_y = distancia_camera * tan(fov_y_rad / 2.0);
     double metade_visivel_x = metade_visivel_y * aspecto;
 
-    // Metade da projecao horizontal/vertical do objeto no espaco de mundo.
-    // Esse raio dinamico considera escala/rotacao atuais, pois mede os vertices.
     double raio_x = 0.0;
     double raio_y = 0.0;
     for (int i = 0; i < static_cast<int>(poligono.vertices.size()); i++) {
@@ -449,40 +501,93 @@ void aplicar_wraparound_xy(Poligono3D& poligono) {
         raio_y = std::max(raio_y, dy);
     }
 
-    // Limites de saida total: centro ultrapassa a area visivel expandida pelo raio.
-    // Assim o wrap ocorre quando o cubo efetivamente ja deixou a tela.
-    double limite_esq = -metade_visivel_x - raio_x;
-    double limite_dir = metade_visivel_x + raio_x;
-    double limite_inf = -metade_visivel_y - raio_y;
-    double limite_sup = metade_visivel_y + raio_y;
+    limites.min_x = -metade_visivel_x;
+    limites.max_x = metade_visivel_x;
+    limites.min_y = -metade_visivel_y;
+    limites.max_y = metade_visivel_y;
+    limites.raio_x = raio_x;
+    limites.raio_y = raio_y;
+    return limites;
+}
 
-    double delta_x_wrap = 0.0;
-    double delta_y_wrap = 0.0;
+bool detectar_saida_xy(const Poligono3D& poligono, char& direcao_saida) {
+    LimitesTela limites = calcular_limites_tela(poligono);
 
-    // Calcula deslocamento de teleporte entre as bordas opostas.
-    if (poligono.centro[0] < limite_esq) {
-        delta_x_wrap = (limite_dir - limite_esq);
-    } else if (poligono.centro[0] > limite_dir) {
-        delta_x_wrap = -(limite_dir - limite_esq);
+    if (poligono.centro[0] - limites.raio_x <= limites.min_x) {
+        direcao_saida = 'L';
+        return true;
+    }
+    if (poligono.centro[0] + limites.raio_x >= limites.max_x) {
+        direcao_saida = 'R';
+        return true;
+    }
+    if (poligono.centro[1] + limites.raio_y >= limites.max_y) {
+        direcao_saida = 'U';
+        return true;
+    }
+    if (poligono.centro[1] - limites.raio_y <= limites.min_y) {
+        direcao_saida = 'D';
+        return true;
     }
 
-    if (poligono.centro[1] < limite_inf) {
-        delta_y_wrap = (limite_sup - limite_inf);
-    } else if (poligono.centro[1] > limite_sup) {
-        delta_y_wrap = -(limite_sup - limite_inf);
-    }
+    direcao_saida = 'n';
+    return false;
+}
 
-    if (delta_x_wrap == 0.0 && delta_y_wrap == 0.0) {
+void iniciar_transicao_borda(char direcao_saida) {
+    em_transicao_borda = true;
+    direcao_transicao = direcao_saida;
+
+    // Eixo Z foi escolhido por estabilidade visual no plano da tela.
+    eixo_rotacao_transicao = 'z';
+
+    giro_acumulado_transicao = 0.0;
+}
+
+void atualizar_transicao_borda() {
+    if (!em_transicao_borda) {
         return;
     }
 
-    // Aplica o mesmo deslocamento ao centro e a todos os vertices,
-    // preservando forma, escala e orientacao atuais do cubo.
-    poligono.centro[0] += delta_x_wrap;
-    poligono.centro[1] += delta_y_wrap;
+    double restante = giro_total_transicao - giro_acumulado_transicao;
+    double angulo_passo = std::min(passo_giro_transicao, restante);
+
+    rotacionar(cubo, angulo_passo, eixo_rotacao_transicao);
+    giro_acumulado_transicao += angulo_passo;
+
+    if (giro_acumulado_transicao + epsilon >= giro_total_transicao) {
+        reaparecer_no_lado_oposto(cubo, direcao_transicao);
+
+        em_transicao_borda = false;
+        direcao_transicao = 'n';
+        giro_acumulado_transicao = 0.0;
+    }
+}
+
+void reaparecer_no_lado_oposto(Poligono3D& poligono, char direcao_saida) {
+    LimitesTela limites = calcular_limites_tela(poligono);
+
+    double destino_x = poligono.centro[0];
+    double destino_y = poligono.centro[1];
+
+    if (direcao_saida == 'L') {
+        destino_x = limites.max_x - limites.raio_x;
+    } else if (direcao_saida == 'R') {
+        destino_x = limites.min_x + limites.raio_x;
+    } else if (direcao_saida == 'U') {
+        destino_y = limites.min_y + limites.raio_y;
+    } else if (direcao_saida == 'D') {
+        destino_y = limites.max_y - limites.raio_y;
+    }
+
+    double delta_x = destino_x - poligono.centro[0];
+    double delta_y = destino_y - poligono.centro[1];
+
+    poligono.centro[0] = destino_x;
+    poligono.centro[1] = destino_y;
 
     for (int i = 0; i < static_cast<int>(poligono.vertices.size()); i++) {
-        poligono.vertices[i][0] += delta_x_wrap;
-        poligono.vertices[i][1] += delta_y_wrap;
+        poligono.vertices[i][0] += delta_x;
+        poligono.vertices[i][1] += delta_y;
     }
 }
