@@ -1,0 +1,16 @@
+﻿  CGAula090322.cpp
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(17,35): warning C4305: 'inicializando': truncamento de 'double' para 'float'
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(18,33): warning C4305: 'inicializando': truncamento de 'double' para 'float'
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(61,23): warning C4018: '<': incompatibilidade de signed/unsigned
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(106,64): warning C4267: '=': conversão de 'size_t' para 'int', possível perda de dados
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(256,39): warning C4305: '-=': truncamento de 'double' para 'float'
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(258,39): warning C4305: '+=': truncamento de 'double' para 'float'
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(261,26): warning C4305: '-=': truncamento de 'double' para 'float'
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(263,26): warning C4305: '+=': truncamento de 'double' para 'float'
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(266,26): warning C4305: '+=': truncamento de 'double' para 'float'
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(268,26): warning C4305: '-=': truncamento de 'double' para 'float'
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(292,51): warning C4305: 'inicializando': truncamento de 'double' para 'GLfloat'
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(296,54): warning C4305: 'inicializando': truncamento de 'double' para 'GLfloat'
+C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\CGAula090322\CGAula090322.cpp(299,52): warning C4305: 'inicializando': truncamento de 'double' para 'GLfloat'
+  CGAula090322.vcxproj -> C:\Users\rodri\Downloads\CGAula090322\CGAula090322\CGAula090322\x64\Debug\CGAula090322.exe
+          1 arquivo(s) copiado(s).
